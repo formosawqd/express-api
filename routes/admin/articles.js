@@ -1,19 +1,37 @@
 var express = require('express');
 var router = express.Router();
-const { Article } = require('../../models')
+const { Article } = require('../../models');
+const { Op } = require('sequelize');
 
 /* GET 文章列表. */
 router.get('/', async function (req, res, next) {
     try {
+        const { title } = req.query
+        const currentPage = Math.abs(Number(req.query.currentPage)) || 1
+        const pageSize = Math.abs(Number(req.query.pageSize)) || 10
         const condition = {
-            order: [['id', 'DESC']]
+            order: [['id', 'ASC']],
+            limit: pageSize,
+            offset: (currentPage - 1) * pageSize
         }
-        const list = await Article.findAll(condition)
+        if (title) {
+            condition.where = {
+                title: {
+                    [Op.like]: `%${title}%`
+                }
+            }
+        }
+        const { count, rows } = await Article.findAndCountAll(condition)
         res.json({
             status: true,
             message: '查询文章列表成功',
             data: {
-                list
+                rows,
+                pagination: {
+                    total: count,
+                    pageSize,
+                    currentPage
+                }
             }
         });
     } catch (error) {
@@ -60,7 +78,11 @@ router.get('/:id', async function (req, res, next) {
 /* GET 文章创建. */
 router.post('/', async function (req, res, next) {
     try {
-        const article = await Article.create(req.body)
+        const body = {
+            title: req.body.title,
+            content: req.body.content
+        }
+        const article = await Article.create(body)
         res.status(201).json({
             status: true,
             message: '创建文章成功',
@@ -115,7 +137,11 @@ router.put('/:id', async function (req, res, next) {
         const { id } = req.params
         const article = await Article.findByPk(id)
         if (article) {
-            await article.update(req.body)
+            const body = {
+                title: req.body.title,
+                content: req.body.content,
+            }
+            await article.update(body)
             res.json({
                 status: true,
                 message: '更新成功',
